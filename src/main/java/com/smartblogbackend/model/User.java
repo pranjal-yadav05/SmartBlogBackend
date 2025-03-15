@@ -29,6 +29,17 @@ public class User {
     private String password;
     private String name;
 
+    public String getProfileImage() {
+        return profileImage;
+    }
+
+    public void setProfileImage(String profileImage) {
+        this.profileImage = profileImage;
+    }
+
+    @Column(name = "profile_image")
+    private String profileImage;
+
     public Long getId() {
         return this.id;
     }

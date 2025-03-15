@@ -2,6 +2,8 @@ package com.smartblogbackend.service;
 
 import com.smartblogbackend.model.User;
 import com.smartblogbackend.repository.UserRepository;
+
+import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,5 +22,12 @@ public class UserService {
 
     public User saveUser(User user) {
         return (User)this.userRepository.save(user);
+    }
+
+    public List<User> getAllUsers(String search) {
+        if (search != null && !search.isEmpty()) {
+            return userRepository.findByNameContainingIgnoreCase(search);
+        }
+        return userRepository.findAll();
     }
 }

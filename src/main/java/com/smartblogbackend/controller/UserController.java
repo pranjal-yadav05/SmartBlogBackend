@@ -1,18 +1,21 @@
 package com.smartblogbackend.controller;
 
 import com.smartblogbackend.model.User;
+import com.smartblogbackend.service.CloudinaryService;
 import com.smartblogbackend.service.UserService;
 import com.smartblogbackend.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.sound.midi.Soundbank;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -21,16 +24,44 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-    private JwtUtil jwtUtil = new JwtUtil(); // Initialize JwtUtil
+    @Autowired
+    private CloudinaryService cloudinaryService;
+
+    private JwtUtil jwtUtil = new JwtUtil();
 
     @PostMapping("/register")
     public User registerUser(@RequestBody User user) {
         return this.userService.saveUser(user);
     }
 
-    @GetMapping("/{email}")
-    public Optional<User> getUserByEmail(@PathVariable String email) {
-        return this.userService.findUserByEmail(email);
+    @GetMapping("/profile")
+    public ResponseEntity<?> getUserProfile(@RequestHeader("Authorization") String authHeader) {
+        try {
+            System.out.println("======== inside getUserProfile --=========");
+            // Extract token from Authorization header (remove "Bearer " prefix)
+            String token = authHeader.substring(7);
+
+            // Extract user email from JWT token
+            String email = jwtUtil.extractEmail(token);
+            System.out.println("email " + email);
+            Optional<User> user = userService.findUserByEmail(email);
+            if (user.isPresent()) {
+                User foundUser = user.get();
+                // Don't send password back to client
+                foundUser.setPassword(null);
+                return ResponseEntity.ok(foundUser);
+            } else {
+                return ResponseEntity.status(404).body(Map.of("message", "User not found"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(401).body(Map.of("message", "Invalid or expired token"));
+        }
+    }
+
+    @GetMapping
+    public ResponseEntity<List<User>> getAllUsers(@RequestParam(value = "search", required = false) String search) {
+        List<User> users = userService.getAllUsers(search);
+        return ResponseEntity.ok(users);
     }
 
     @PostMapping("/login")
@@ -43,10 +74,74 @@ public class UserController {
                 String token = jwtUtil.generateJwtToken(foundUser);
                 return ResponseEntity.ok(new AuthenticationResponse(token));
             } else {
-                throw new RuntimeException("Invalid password");
+                return ResponseEntity.status(401).body(Map.of("message", "Invalid password"));
             }
         } else {
-            throw new RuntimeException("User not found");
+            return ResponseEntity.status(404).body(Map.of("message", "User not found"));
+        }
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateUserProfile(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(value = "name", required = true) String name,
+            @RequestParam(value = "email", required = true) String email,
+            @RequestParam(value = "currentPassword", required = false) String currentPassword,
+            @RequestParam(value = "password", required = false) String newPassword,
+            @RequestParam(value = "image", required = false) MultipartFile image) throws IOException {
+
+        try {
+            // Extract token from Authorization header (remove "Bearer " prefix)
+            String token = authHeader.substring(7);
+
+            // Extract user email from JWT token
+            String tokenEmail = jwtUtil.extractEmail(token);
+
+            // Verify the email in token matches the email being updated
+            if (!tokenEmail.equals(email)) {
+                return ResponseEntity.status(403).body(Map.of("message", "You can only update your own profile"));
+            }
+
+            Optional<User> existingUserOpt = userService.findUserByEmail(email);
+            if (existingUserOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of("message", "User not found"));
+            }
+
+            User user = existingUserOpt.get();
+
+            // If changing password, validate current password
+            if (newPassword != null && !newPassword.isEmpty()) {
+                if (currentPassword == null || !user.getPassword().equals(currentPassword)) {
+                    return ResponseEntity.status(400).body(Map.of("message", "Current password is incorrect"));
+                }
+
+                // Update password
+                user.setPassword(newPassword);
+            }
+
+            // Update name
+            user.setName(name);
+
+            // Handle image upload if provided
+            if (image != null && !image.isEmpty()) {
+                try {
+                    byte[] imageBytes = image.getBytes();
+                    String imageUrl = cloudinaryService.uploadImage(imageBytes);
+                    user.setProfileImage(imageUrl);
+                } catch (IOException e) {
+                    return ResponseEntity.status(500).body(Map.of("message", "Failed to upload image"));
+                }
+            }
+
+            // Save updated user
+            User updatedUser = userService.saveUser(user);
+
+            // Don't return password in response
+            updatedUser.setPassword(null);
+
+            return ResponseEntity.ok(updatedUser);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Error updating profile: " + e.getMessage()));
         }
     }
 

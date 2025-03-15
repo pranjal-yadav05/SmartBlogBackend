@@ -35,4 +35,7 @@ public class BlogPostService {
             throw new RuntimeException("Post not found with ID: " + id);
         }
     }
+    public List<BlogPost> getPostsByUser(String email) {
+        return blogPostRepository.findByAuthorEmail(email); // ✅ Fetch user's posts
+    }
 }

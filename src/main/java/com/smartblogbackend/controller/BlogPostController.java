@@ -124,4 +124,13 @@ public class BlogPostController {
         }
     }
 
+    @GetMapping("/user/{email}")
+    public ResponseEntity<?> getPostsByUser(@PathVariable String email) {
+        List<BlogPost> posts = blogPostService.getPostsByUser(email);
+        if (posts.isEmpty()) {
+            return ResponseEntity.status(404).body("No posts found for this user");
+        }
+        return ResponseEntity.ok(posts); // ✅ Return user's posts
+    }
+
 }
