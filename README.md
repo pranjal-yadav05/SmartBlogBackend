@@ -1,4 +1,7 @@
-# SmartBlog Backend
+<p align="center">
+  <img src="./backend-logo.png" alt="SmartBlog Logo" width="800" style="border-radius: 50px;"/>
+</p>
+
 
 SmartBlog Backend is the core API service for the SmartBlog platform, built with **Spring Boot** and **MySQL**. It handles authentication, post management, AI-generated content via Google Gemini, and more.
 
@@ -27,7 +30,7 @@ SmartBlog Backend is the core API service for the SmartBlog platform, built with
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/yourusername/smartblogbackend.git
+   git clone https://github.com/pranjal-yadav05/smartblogbackend.git
    cd smartblogbackend
    ```
 
@@ -66,6 +69,9 @@ SmartBlog Backend is the core API service for the SmartBlog platform, built with
 
    # Gemini API Key
    gemini.api.key=${GEMINI_API_KEY}
+   
+   # Cloudinary URL
+   CLOUDINARY_URL=${CLOUDINARY_URL}
    ```
 
 4. Build the project:
