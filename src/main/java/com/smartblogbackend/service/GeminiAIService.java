@@ -18,10 +18,26 @@ public class GeminiAIService {
     private static final String GEMINI_API_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
 
-    public String generateBlogPost(String prompt) {
+    public String generateBlogPost(String topic) {
         try {
             RestTemplate restTemplate = new RestTemplate();
             String url = GEMINI_API_URL + apiKey;
+
+            String prompt = "Write a well-structured, engaging, and SEO-friendly blog post on the topic: *"
+                    + topic + "*.\n\n"
+                    + "### Guidelines:\n\n"
+                    + "- **Title:** A compelling, attention-grabbing title.\n"
+                    + "- **Introduction:** Start with an engaging hook to captivate the reader.\n"
+                    + "- **Body:**\n"
+                    + "  - Use **well-organized sections** with informative subheadings.\n"
+                    + "  - Maintain a **clear and concise writing style**.\n"
+                    + "- **Conclusion:** Summarize key points with a strong takeaway.\n"
+                    + "- **Formatting:**\n"
+                    + "  - Use `#` for headings.\n"
+                    + "  - Use `**bold**` for emphasis.\n"
+                    + "  - Use `*italic*` where necessary.\n"
+                    + "- Ensure the article is **ready to be published** without extra editing.";
+
 
             // ✅ Correct request body format
             Map<String, Object> requestBody = Map.of(

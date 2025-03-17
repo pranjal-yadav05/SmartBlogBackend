@@ -1,14 +1,32 @@
-# Use an official Java runtime as a parent image
-FROM openjdk:17-jdk-slim
+# Use an official OpenJDK image as a base
+FROM openjdk:17-jdk-slim AS build
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the built JAR file into the container
-COPY target/*.jar app.jar
+# Copy the Maven build files
+COPY pom.xml ./
+COPY mvnw ./
+COPY .mvn/ .mvn/
 
-# Expose the port your Spring Boot app runs on
+# Ensure Maven wrapper is executable
+RUN chmod +x mvnw
+
+# Copy the project source
+COPY src src
+
+# Build the application
+RUN ./mvnw package -DskipTests
+
+# Use a smaller JDK image for the final image
+FROM openjdk:17-jdk-slim
+
+WORKDIR /app
+
+# Copy the built JAR
+COPY --from=build /app/target/SmartBlog-1.0.0.jar app.jar
+
+# Expose port 8080
 EXPOSE 8080
 
-# Use entrypoint for better signal handling (graceful shutdown)
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Run the JAR file
+CMD ["java", "-jar", "app.jar"]

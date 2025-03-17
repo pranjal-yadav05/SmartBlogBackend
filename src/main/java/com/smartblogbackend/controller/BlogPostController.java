@@ -67,7 +67,7 @@ public class BlogPostController {
             if (imageFile != null && !imageFile.isEmpty()) {
                 imageUrl = cloudinaryService.uploadImage(imageFile.getBytes()); // ✅ Upload image to Cloudinary
             }
-
+            System.out.println("============== " + category + "============");
             BlogPost blogPost = new BlogPost();
             blogPost.setTitle(title);
             blogPost.setContent(content);
