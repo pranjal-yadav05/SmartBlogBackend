@@ -13,6 +13,9 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private EmailService emailService;
+
     public UserService() {
     }
 
@@ -21,7 +24,12 @@ public class UserService {
     }
 
     public User saveUser(User user) {
-        return (User)this.userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        // Send welcome email after user is successfully saved
+        emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getName());
+
+        return savedUser;
     }
 
     public List<User> getAllUsers(String search) {

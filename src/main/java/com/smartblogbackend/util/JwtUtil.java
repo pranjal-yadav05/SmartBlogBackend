@@ -66,6 +66,7 @@ public class JwtUtil {
         DecodedJWT decodedJWT = JWT.require(Algorithm.HMAC256(secretKeyStatic))
                 .build()
                 .verify(token);
+
         return decodedJWT.getClaim("userId").asLong(); // Extract userId claim
     }
 
