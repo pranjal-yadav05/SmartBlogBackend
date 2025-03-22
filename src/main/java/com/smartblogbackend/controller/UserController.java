@@ -1,16 +1,19 @@
 package com.smartblogbackend.controller;
 
+import com.smartblogbackend.model.AuthenticationResponse;
 import com.smartblogbackend.model.User;
 import com.smartblogbackend.service.CloudinaryService;
 import com.smartblogbackend.service.UserService;
 import com.smartblogbackend.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.sound.midi.Soundbank;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -59,9 +62,67 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<List<User>> getAllUsers(@RequestParam(value = "search", required = false) String search) {
+    public ResponseEntity<?> getAllUsers(
+            @RequestParam(value = "search", required = false) String search,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        
+        // Require a search term to avoid returning all users
+        if (search == null || search.trim().isEmpty() || search.trim().length() < 2) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        
+        // If search is provided, use the regular search flow
         List<User> users = userService.getAllUsers(search);
+        // Remove password from response
+        users.forEach(user -> user.setPassword(null));
         return ResponseEntity.ok(users);
+    }
+    
+    @GetMapping("/search")
+    public ResponseEntity<?> searchUsers(
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestParam(value = "sortBy", defaultValue = "name") String sortBy,
+            @RequestParam(value = "direction", defaultValue = "asc") String direction) {
+        
+        // Return empty results if query is empty or too short
+        if (query == null || query.trim().isEmpty() || query.trim().length() < 2) {
+            return ResponseEntity.ok(Map.of(
+                "content", List.of(),
+                "totalElements", 0,
+                "totalPages", 0,
+                "size", size,
+                "number", page,
+                "empty", true
+            ));
+        }
+        
+        // Validate pagination parameters
+        if (page < 0) {
+            page = 0;
+        }
+        if (size < 1 || size > 100) {
+            size = 10; // Default size if invalid
+        }
+        
+        Page<User> userPage = userService.searchUsers(query, page, size, sortBy, direction);
+        return ResponseEntity.ok(userPage);
+    }
+    
+    @GetMapping("/by-initial/{initial}")
+    public ResponseEntity<?> findUsersByInitial(
+            @PathVariable String initial,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        
+        if (initial == null || initial.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Initial letter is required"));
+        }
+        
+        Page<User> userPage = userService.findUsersByInitial(initial, page, size);
+        return ResponseEntity.ok(userPage);
     }
 
     @PostMapping("/login")
@@ -142,22 +203,6 @@ public class UserController {
             return ResponseEntity.ok(updatedUser);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Error updating profile: " + e.getMessage()));
-        }
-    }
-
-    public static class AuthenticationResponse {
-        private String token;
-
-        public AuthenticationResponse(String token) {
-            this.token = token;
-        }
-
-        public String getToken() {
-            return token;
-        }
-
-        public void setToken(String token) {
-            this.token = token;
         }
     }
 }
