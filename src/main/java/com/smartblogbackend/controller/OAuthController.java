@@ -31,6 +31,12 @@ public class OAuthController {
     @Value("${frontend.url}")
     private String frontendUrl;
 
+    @GetMapping("/login/oauth2/code/google")
+    public RedirectView handleGoogleOAuthCallback(@AuthenticationPrincipal OAuth2User oauth2User) {
+        // Delegate to the existing success handler
+        return oauthSuccess(oauth2User);
+    }
+
     @GetMapping("/success")
     public RedirectView oauthSuccess(@AuthenticationPrincipal OAuth2User oauth2User) {
         logger.info("OAuth success endpoint called");

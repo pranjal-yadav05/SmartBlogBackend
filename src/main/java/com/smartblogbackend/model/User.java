@@ -1,6 +1,7 @@
 package com.smartblogbackend.model;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -26,6 +27,7 @@ public class User {
     @Column(
             nullable = false
     )
+    @JsonIgnore
     private String password;
     private String name;
 
@@ -48,6 +50,7 @@ public class User {
         return this.email;
     }
 
+    @JsonIgnore
     public String getPassword() {
         return this.password;
     }

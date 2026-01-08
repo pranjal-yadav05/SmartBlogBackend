@@ -9,6 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+
 
 @Service
 public class BlogPostService {
@@ -41,6 +44,29 @@ public class BlogPostService {
             throw new RuntimeException("Post not found with ID: " + id);
         }
     }
+
+    public BlogPost updatePost(
+            Long id,
+            String title,
+            String content,
+            String category,
+            String imageUrl
+    ) {
+        BlogPost existingPost = blogPostRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found with ID: " + id));
+
+        existingPost.setTitle(title);
+        existingPost.setContent(content);
+        existingPost.setCategory(category);
+
+        // Only update image if a new one was uploaded
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            existingPost.setImageUrl(imageUrl);
+        }
+
+        return blogPostRepository.save(existingPost);
+    }
+
     
     public List<BlogPost> getPostsByUser(String email) {
         return blogPostRepository.findByAuthorEmail(email); // ✅ Fetch user's posts

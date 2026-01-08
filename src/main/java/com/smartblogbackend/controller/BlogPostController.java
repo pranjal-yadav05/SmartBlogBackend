@@ -16,6 +16,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import java.io.IOException;
+
+
 
 import java.util.HashMap;
 import java.util.List;
@@ -134,22 +138,99 @@ public class BlogPostController {
         }
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletePost(@PathVariable Long id, @RequestHeader("email") String userEmail) {
-        try {
-            BlogPost post = blogPostService.getPostById(id)
-                    .orElseThrow(() -> new RuntimeException("Post not found"));
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updatePostWithImage(
+            @PathVariable Long id,
+            @RequestParam String title,
+            @RequestParam String content,
+            @RequestParam String category,
+            @RequestParam(required = false) MultipartFile imageFile,
+            Authentication authentication) {
+        
+        System.out.println("============== Update Post Called ==============");
+        String userEmail = authentication.getName();
 
-            if (!post.getAuthor().getEmail().equals(userEmail)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You can only delete your own posts.");
-            }
+        BlogPost post = blogPostService.getPostById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
 
-            blogPostService.deletePost(id);
-            return ResponseEntity.ok("Post deleted successfully.");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete post: " + e.getMessage());
+        if (!post.getAuthor().getEmail().equals(userEmail)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("You can only update your own posts.");
         }
+
+        String imageUrl = null;
+
+        if (imageFile != null && !imageFile.isEmpty()) {
+            try {
+                imageUrl = cloudinaryService.uploadImage(imageFile.getBytes());
+                System.out.println("============== Uploaded Image ==============");
+                System.out.println(imageUrl);
+            } catch (IOException e) {
+                return ResponseEntity
+                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Failed to upload image");
+            }
+        }
+
+
+        BlogPost updated = blogPostService.updatePost(
+                id,
+                title,
+                content,
+                category,
+                imageUrl
+        );
+
+        return ResponseEntity.ok(updated);
     }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> updatePost(
+            @PathVariable Long id,
+            @RequestBody BlogPost updatedPost,
+            Authentication authentication) {
+
+        String userEmail = authentication.getName();
+
+        BlogPost post = blogPostService.getPostById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        if (!post.getAuthor().getEmail().equals(userEmail)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("You can only update your own posts.");
+        }
+
+        BlogPost saved = blogPostService.updatePost(
+                id,
+                updatedPost.getTitle(),
+                updatedPost.getContent(),
+                updatedPost.getCategory(),
+                null
+        );
+
+        return ResponseEntity.ok(saved);
+    }
+
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deletePost(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        String userEmail = authentication.getName(); // extracted from JWT
+
+        BlogPost post = blogPostService.getPostById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+
+        if (!post.getAuthor().getEmail().equals(userEmail)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("You can only delete your own posts.");
+        }
+
+        blogPostService.deletePost(id);
+        return ResponseEntity.ok("Post deleted successfully.");
+    }
+
 
     @GetMapping("/user/{email}")
     public ResponseEntity<?> getPostsByUser(@PathVariable String email) {
