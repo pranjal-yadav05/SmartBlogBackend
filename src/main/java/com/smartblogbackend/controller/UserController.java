@@ -170,13 +170,26 @@ public class UserController {
 
             User user = existingUserOpt.get();
 
-            // If changing password, validate current password
+            // If changing password, validate appropriately
             if (newPassword != null && !newPassword.isEmpty()) {
-                if (currentPassword == null || !user.getPassword().equals(currentPassword)) {
-                    return ResponseEntity.status(400).body(Map.of("message", "Current password is incorrect"));
+                String existingPassword = user.getPassword();
+
+                // Heuristic: if the existing password looks like a generated UUID,
+                // treat this account as Google-OAuth-only and allow setting a
+                // real password for the first time without requiring currentPassword.
+                boolean looksLikeOauthGenerated =
+                        existingPassword != null
+                                && existingPassword.length() == 36
+                                && existingPassword.chars().filter(ch -> ch == '-').count() == 4;
+
+                if (!looksLikeOauthGenerated) {
+                    // Regular local account: require current password
+                    if (currentPassword == null || !existingPassword.equals(currentPassword)) {
+                        return ResponseEntity.status(400).body(Map.of("message", "Current password is incorrect"));
+                    }
                 }
 
-                // Update password
+                // Update password (both for regular and OAuth-first-time-password cases)
                 user.setPassword(newPassword);
             }
 

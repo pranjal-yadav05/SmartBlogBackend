@@ -40,14 +40,16 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             // Use stateless session management except for OAuth2
-            .sessionManagement(session -> 
-                session.sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
+            .sessionManagement(session ->
+                // Use stateless JWT for API calls; OAuth2 login will still work via its own flow
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
                 // Allow OPTIONS preflight requests
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Public endpoints
-                .requestMatchers("/api/users/login", "/api/users/register", "/api/oauth2/**", "/login/**", "/oauth2/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/users/login", "/api/users/register").permitAll()
+                .requestMatchers("/api/oauth2/**", "/login/**", "/oauth2/**").permitAll()
                 .requestMatchers("/oauth2/authorization/**").permitAll()
                 .requestMatchers("/api/posts/**").permitAll()
                 .requestMatchers("/api/debug/**").permitAll() // Allow debug endpoints
