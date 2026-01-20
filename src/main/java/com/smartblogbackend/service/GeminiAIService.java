@@ -69,7 +69,7 @@ public class GeminiAIService {
             return "AI did not return content.";
         } catch (Exception e) {
             System.err.println("Error calling Gemini API: " + e.getMessage());
-            return "Apologies, AI Service Unavailable at the moment.";
+            return "Apologies, AI Service is Unavailable at the moment.";
         }
     }
 }

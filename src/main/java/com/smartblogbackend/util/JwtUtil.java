@@ -49,7 +49,7 @@ public class JwtUtil {
                 .withClaim("userId", user.getId())
                 .withClaim("profileImage",user.getProfileImage())
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // 1 hour expiration
+                .withExpiresAt(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 7)) // 1 hour expiration
                 .sign(algorithm);
     }
 
