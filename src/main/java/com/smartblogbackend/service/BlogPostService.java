@@ -24,6 +24,9 @@ public class BlogPostService {
     @Autowired
     private CloudinaryService cloudinaryService;
 
+    @Autowired
+    private com.smartblogbackend.repository.UserRepository userRepository;
+
     public BlogPostService() {
     }
 
@@ -156,7 +159,47 @@ public class BlogPostService {
         return savedPost;
     }
 
-    public List<java.util.Map<String, Object>> getCategoriesWithCounts() {
-        return blogPostRepository.countPostsByCategory();
+    public Page<java.util.Map<String, Object>> getCategoriesWithCounts(Pageable pageable) {
+        return blogPostRepository.countPostsByCategory(pageable);
+    }
+
+    public Page<java.util.Map<String, Object>> searchCategoriesWithCounts(String query, Pageable pageable) {
+        if (query == null || query.isBlank()) {
+            return blogPostRepository.countPostsByCategory(pageable);
+        }
+        return blogPostRepository.searchCategoriesWithCounts(query, pageable);
+    }
+
+    @jakarta.transaction.Transactional
+    public void incrementViews(Long id) {
+        blogPostRepository.incrementViews(id);
+    }
+
+    // --- Engagement Methods (Claps & Comments) ---
+
+    @Autowired
+    private com.smartblogbackend.repository.CommentRepository commentRepository;
+
+    @jakarta.transaction.Transactional
+    public void incrementClaps(Long id, int amount) {
+        // limit standard clap amount per request to prevent abuse if needed, 
+        // but user requested creating a feature where user can clap multiple times.
+        // We will trust the controller to pass reasonable amounts (e.g. 1).
+        blogPostRepository.incrementClaps(id, amount);
+    }
+
+    public com.smartblogbackend.model.Comment addComment(Long postId, String content, String userEmail) {
+        BlogPost post = blogPostRepository.findById(postId)
+                .orElseThrow(() -> new RuntimeException("Post not found"));
+        
+        com.smartblogbackend.model.User author = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        com.smartblogbackend.model.Comment comment = new com.smartblogbackend.model.Comment(content, post, author);
+        return commentRepository.save(comment);
+    }
+
+    public List<com.smartblogbackend.model.Comment> getCommentsByPostId(Long postId) {
+        return commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
     }
 }

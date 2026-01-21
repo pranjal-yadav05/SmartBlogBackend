@@ -25,6 +25,21 @@ public interface BlogPostRepository extends JpaRepository<BlogPost, Long> {
     @EntityGraph(attributePaths = {"author"})
     Optional<BlogPost> findById(Long id);
 
-    @org.springframework.data.jpa.repository.Query("SELECT p.category as name, COUNT(p) as count FROM BlogPost p GROUP BY p.category")
-    List<Map<String, Object>> countPostsByCategory();
+    @org.springframework.data.jpa.repository.Query(value = "SELECT p.category as name, COUNT(p) as count FROM BlogPost p GROUP BY p.category", 
+            countQuery = "SELECT COUNT(DISTINCT p.category) FROM BlogPost p")
+    Page<Map<String, Object>> countPostsByCategory(Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT p.category as name, COUNT(p) as count FROM BlogPost p WHERE LOWER(p.category) LIKE LOWER(CONCAT('%', :query, '%')) GROUP BY p.category",
+            countQuery = "SELECT COUNT(DISTINCT p.category) FROM BlogPost p WHERE LOWER(p.category) LIKE LOWER(CONCAT('%', :query, '%'))")
+    Page<Map<String, Object>> searchCategoriesWithCounts(@org.springframework.data.repository.query.Param("query") String query, Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @jakarta.transaction.Transactional
+    @org.springframework.data.jpa.repository.Query("UPDATE BlogPost p SET p.views = p.views + 1 WHERE p.id = :id")
+    void incrementViews(@org.springframework.data.repository.query.Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @jakarta.transaction.Transactional
+    @org.springframework.data.jpa.repository.Query("UPDATE BlogPost p SET p.claps = p.claps + :amount WHERE p.id = :id")
+    void incrementClaps(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("amount") int amount);
 }

@@ -5,8 +5,8 @@ import com.smartblogbackend.model.DraftPost;
 import com.smartblogbackend.model.User;
 import com.smartblogbackend.service.BlogPostService;
 import com.smartblogbackend.service.CloudinaryService;
+import com.smartblogbackend.service.OpenRouterAIService;
 import com.smartblogbackend.service.UserService;
-import com.smartblogbackend.service.GeminiAIService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -35,7 +35,7 @@ public class BlogPostController {
     private UserService userService;
 
     @Autowired
-    private GeminiAIService geminiAIService;
+    private OpenRouterAIService openRouterAIService;
 
     @Autowired
     private CloudinaryService cloudinaryService;
@@ -72,8 +72,44 @@ public class BlogPostController {
     }
 
     @GetMapping("/categories/counts")
-    public ResponseEntity<List<Map<String, Object>>> getCategoryCounts() {
-        return ResponseEntity.ok(blogPostService.getCategoriesWithCounts());
+    public ResponseEntity<Map<String, Object>> getCategoryCounts(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Map<String, Object>> pageResult = blogPostService.searchCategoriesWithCounts(search, pageable);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("categories", pageResult.getContent());
+        response.put("currentPage", pageResult.getNumber());
+        response.put("totalItems", pageResult.getTotalElements());
+        response.put("totalPages", pageResult.getTotalPages());
+        
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/category/{category}")
+    public ResponseEntity<Map<String, Object>> getPostsByCategoryPaginated(
+            @PathVariable String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
+        
+        Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? 
+                Sort.Direction.ASC : Sort.Direction.DESC;
+        
+        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, sortBy));
+        Page<BlogPost> pageResult = blogPostService.getPostsByCategory(category, pageable);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", pageResult.getContent());
+        response.put("currentPage", pageResult.getNumber());
+        response.put("totalItems", pageResult.getTotalElements());
+        response.put("totalPages", pageResult.getTotalPages());
+        
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @GetMapping("/{id}")
@@ -81,6 +117,12 @@ public class BlogPostController {
         Optional<BlogPost> blogPost = blogPostService.getPostById(id);
         return blogPost.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/view")
+    public ResponseEntity<Void> incrementViews(@PathVariable Long id) {
+        blogPostService.incrementViews(id);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -129,26 +171,25 @@ public class BlogPostController {
         }
     }
 
-    @PostMapping("/generate")
-    public ResponseEntity<?> generatePost(@RequestBody Map<String, Object> payload) {
+    @PostMapping("/suggestions")
+    public ResponseEntity<?> getAISuggestions(@RequestBody Map<String, Object> payload) {
         try {
-            String prompt = (String) payload.get("prompt");
-            String authorEmail = (String) payload.get("authorEmail");
+            String title = (String) payload.get("title");
+            String content = (String) payload.get("content");
 
-            if (prompt == null || prompt.isEmpty() || authorEmail == null) {
-                return ResponseEntity.badRequest().body("Missing required fields");
+            if (title == null || content == null) {
+                return ResponseEntity.badRequest().body("Missing required fields: title or content");
             }
 
-            String generatedContent = geminiAIService.generateBlogPost(prompt);
+            String suggestions = openRouterAIService.getAISuggestions(title, content);
 
             Map<String, String> response = Map.of(
-                    "title", "AI-Generated: " + prompt,
-                    "content", generatedContent
+                    "suggestions", suggestions
             );
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to generate post: " + e.getMessage());
+            return ResponseEntity.badRequest().body("Failed to get suggestions: " + e.getMessage());
         }
     }
 
@@ -252,6 +293,19 @@ public class BlogPostController {
         return ResponseEntity.ok(blogPostService.getDraftsByUser(email));
     }
 
+    @GetMapping("/drafts/{id}")
+    public ResponseEntity<DraftPost> getDraftById(@PathVariable Long id, Authentication authentication) {
+        String userEmail = authentication.getName();
+        DraftPost draft = blogPostService.getDraftById(id)
+                .orElseThrow(() -> new RuntimeException("Draft not found"));
+
+        if (!draft.getAuthor().getEmail().equals(userEmail)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        return ResponseEntity.ok(draft);
+    }
+
     @PostMapping("/drafts/{id}/publish")
     public ResponseEntity<?> publishDraft(@PathVariable Long id, Authentication authentication) {
         String userEmail = authentication.getName();
@@ -332,5 +386,32 @@ public class BlogPostController {
         );
 
         return ResponseEntity.ok(saved);
+    }
+    @PostMapping("/{id}/claps")
+    public ResponseEntity<Void> incrementClaps(@PathVariable Long id, @RequestParam(defaultValue = "1") int amount) {
+        blogPostService.incrementClaps(id, amount);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<com.smartblogbackend.model.Comment> addComment(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> payload,
+            Authentication authentication) {
+        
+        String userEmail = authentication.getName();
+        String content = payload.get("content");
+        
+        if (content == null || content.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        com.smartblogbackend.model.Comment comment = blogPostService.addComment(id, content, userEmail);
+        return ResponseEntity.ok(comment);
+    }
+
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<List<com.smartblogbackend.model.Comment>> getComments(@PathVariable Long id) {
+        return ResponseEntity.ok(blogPostService.getCommentsByPostId(id));
     }
 }
